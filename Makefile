@@ -3,7 +3,7 @@ export OMP_NUM_THREADS = 1
 export OPENBLAS_NUM_THREADS = 1
 export MKL_NUM_THREADS = 1
 
-.PHONY: setup simulate test lint run visualize
+.PHONY: setup simulate test lint run visualize demo
 setup:
 	python3.11 -m venv .venv
 	$(PYTHON) -m pip install --require-hashes -r requirements.lock
@@ -19,3 +19,5 @@ run:
 	$(PYTHON) -m ice_network.cli run
 visualize:
 	$(PYTHON) -m ice_network.cli visualize
+demo: visualize
+	cp artifacts/replay.html docs/index.html

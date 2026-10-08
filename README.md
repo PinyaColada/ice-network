@@ -1,34 +1,104 @@
 # The chiringuito that never runs out of ice
 
-![Forecast accuracy versus replenishment decisions](artifacts/headline.png)
+![Forecast accuracy versus replenishment cost, and the cost of seven policy/model combinations](artifacts/headline.png)
 
-Twelve fictional beach bars in Mallorca share two depots and six trucks.<br>
-Hot days sell ice; hot nights quietly subtract it from the freezer.<br>
-Sales hide demand when stock runs out, so forecasts start with reconstruction.<br>
-Two probabilistic models feed simple ordering rules and a SCIP replenishment MILP.<br>
-The fixed-seed experiment tests whether forecast accuracy picks the best decisions.
+Twelve fictional beach bars in Mallorca need ice; two depots and six trucks supply it.<br>
+Heat, weekends and surprise parties drive demand, while stored ice melts.<br>
+Selling out hides demand: an empty freezer records no sales, even when people still want drinks.<br>
+This project reconstructs that missing demand, forecasts uncertainty and plans constrained deliveries.<br>
+It replays the same summer under different ordering rules to measure cost, service and waste.
 
-**Result: no accuracy–decision reversal in this preset.** The seasonal model has lower
-one-day MAE (34.00 versus 34.22 bags), and lower cost under the same optimizer
-(€105,271 versus €105,553). Both achieve 96.1% fill. The seasonal P95 rule is cheaper
-still: **€103,405 at 96.2% fill**. No seeds were searched or models tuned to manufacture
-a reversal. A €282 difference in one synthetic season is not evidence of general
-superiority, particularly with a 1% MILP optimality-gap tolerance.
+**The result:** the simple seasonal P95 ordering rule costs **€103,405** and serves
+**96.2% of demand**, beating the optimizer in this fixed-seed experiment. The hoped-for
+case where the most accurate forecaster produces worse decisions **did not occur**.
+The project reports that honestly, alongside the limits of the experiment.
+
+## See the island in action
+
+**[Open the interactive 2D / 3D replay](https://pinyacolada.github.io/ice-network/)**
+
+![Interactive 3D replay of Mallorca, with ice levels, delivery routes and linked charts](artifacts/replay-3d.png)
+
+Choose a policy, select a bar and scrub or play through the season. All charts follow
+the selected day. No installation or login is needed to explore the published replay.
+
+- **3D island:** ice columns at each bar, capacity outlines and animated deliveries.
+  Teal trucks travel out with ice; purple trucks return empty to their depot.
+- **2D analysis:** compare forecasts with demand and sales, and follow deliveries,
+  closing stock, melting, depot dispatches and ice in transit.
+- **Customers:** count bars receiving deliveries, plus clearly labeled visitor
+  equivalents estimated from bags. These are illustrative estimates, not people tracked.
+
+<details>
+<summary>Open the 2D analysis screenshot</summary>
+
+![2D island map and charts for demand, sales, inventory and forecasts](docs/analysis-2d.png)
+
+</details>
+
+![Depot supply and network efficiency charts](artifacts/efficiency.png)
+
+Efficiency charts show service, truck loading, fleet use, production use, ice yield
+and cost per sold bag. Palma and Alcúdia have daily production limits; the simulator
+does **not** model stored depot inventory. Unused production capacity is labeled accordingly.
+Routes and return animations illustrate saved shipments; they are not GPS or road traces.
+
+The replay also works offline: download [docs/index.html](docs/index.html) using
+GitHub's **Download raw file** button and open it in a browser.
+
+## How it works
+
+1. **Simulate a summer.** Seeded weather, tourism, weekdays and random events create
+   demand, including three bars with intermittent sales. Keep the true demand for
+   evaluation, but give the forecasting models only censored sales and observable stockouts.
+2. **Reconstruct and forecast.** Estimate missing demand from earlier similar days.
+   Compare a seasonal baseline with a gradient-boosted hurdle model, which explicitly
+   handles zero-demand days. Both predict P10, P50, P90 and P95 demand quantiles.
+3. **Choose deliveries.** Compare last-week averages, median forecasts, a service-target
+   quantile and a SCIP mixed-integer optimizer. Every policy obeys storage, case-pack,
+   minimum-order, production, truck, cut-off and lead-time constraints.
+4. **Replay decisions.** Retrain weekly on each policy's own observed history and
+   replay the same demand day by day. Count stockouts, melting, trips and total cost.
+
+The challenge is balancing an empty freezer against an expensive puddle. Forecast
+accuracy is measured separately from the quality of the resulting decisions.
+
+## What happened in the published run?
+
+Seed **20261008**, May–September 2025: 49 warmup days and 104 evaluated days.
+The target is **95% fill rate**, defined as bags sold divided by bags demanded.
+
+| Policy / forecaster | Total cost | Fill rate | Lost bags | Melted bags | Trips |
+|---|---:|---:|---:|---:|---:|
+| Last-week average | €642,706 | 56.7% | 51,163 | 627 | 762 |
+| P50 / seasonal | €288,232 | 82.3% | 20,941 | 1,181 | 956 |
+| P95 / seasonal | **€103,405** | **96.2%** | 4,532 | 6,376 | 1,022 |
+| Optimizer / seasonal | €105,271 | 96.1% | 4,646 | 7,131 | 1,025 |
+| P50 / hurdle | €336,082 | 78.9% | 24,923 | 1,026 | 968 |
+| P95 / hurdle | €111,130 | 95.6% | 5,237 | 6,272 | 1,060 |
+| Optimizer / hurdle | €105,553 | 96.1% | 4,660 | 7,301 | 1,034 |
+
+Cost includes transport, holding, melting and a lost-sales penalty; it is not full
+business accounting. Service is measured across all bags, not guaranteed for each
+bar or day. Low melting in the naive policy mostly means there was too little ice.
+
+The seasonal forecaster has slightly lower one-day MAE (34.00 versus 34.22 bags)
+and slightly lower optimizer cost. That €282 difference is small, especially with
+a 1% solver gap tolerance. No seed search was used to manufacture a ranking.
+The optimizer plans only today's orders over four days with nine demand scenarios;
+its approximations help explain why it need not beat a simple rule in replay.
+See the [methodology and result audit](docs/METHODOLOGY.md) for calibration,
+reconstruction limitations and the full accounting assumptions.
 
 ## Run it
 
-Docker is the self-contained path; the image build runs the tests:
+With Docker and Compose:
 
 ```sh
 docker compose run --build --rm ice-network
 ```
 
-Outputs land in `artifacts/`. The image and Python dependencies are pinned; Compose
-uses Linux amd64 (Docker Desktop emulates it on ARM). Linux amd64 was tested. No API
-keys, external datasets or commercial solver license are needed. The first build
-requires internet access. Allow a few minutes for a full run.
-
-With Python 3.11 and Make installed:
+Or with Python 3.11 and Make:
 
 ```sh
 make setup
@@ -36,245 +106,44 @@ make run
 make test lint
 ```
 
-Change the seed or target without overwriting the published results:
+Open **`artifacts/replay.html`** in a browser. The run also writes plots, policy
+results, forecast scores, daily ledgers and solver diagnostics to `artifacts/`.
+Allow a few minutes. No API keys, external datasets or commercial solver license
+are needed. The first install needs internet access; the replay does not.
+
+The Docker image and Python dependencies are pinned. Docker uses Linux amd64,
+tested locally; ARM machines use Docker's emulation.
 
 ```sh
+make simulate   # Only generate demand, observations and simulator plots
+make visualize  # Rebuild the replay from an existing completed backtest
+make demo       # Also refresh the committed docs/index.html snapshot
+
+# Try a different seed and service target without replacing published results:
 .venv/bin/ice-network run --seed 42 --service 0.90 --output artifacts/alternative
 ```
 
-`make simulate` generates only the world, observations and simulator plots. Targets
-between 50% and 95% are supported. Defaults, costs and limits live in `world.py`.
+## Read the code
 
-## Explore the island
-
-`make run` now also creates **`artifacts/replay.html`**. Open it directly in a modern
-browser; the data, charts and Three.js engine are embedded, so it works offline.
-No server, CDN or Node installation is needed. To visualize an existing completed
-backtest without running the models again:
-
-```sh
-make visualize
-# Or: .venv/bin/ice-network visualize --output artifacts/alternative
-```
-
-![The interactive 3D replay](artifacts/replay-3d.png)
-
-Switch between **2D analysis** and the **3D island**, play or scrub through the season,
-and select any policy and bar. Charts show true demand, censored sales, same-day
-P10/P50/P90/P95 forecasts, receipts, closing stock, melting and storage capacity.
-Click a chart to select its day. The naive policy correctly has no forecast band.
-The 3D scene supports orbit/zoom; stock columns share a bags-to-height scale and
-wireframes show capacity. Delivery paths use the saved depot/bar assignments and
-lead times. The coastline and moving trucks are illustrative, not road/GPS tracks.
-Teal trucks carry ice to a bar; on its delivery day, the marker turns purple,
-faces the other way and returns empty to its own depot. It parks there after the
-animation completes, rather than vanishing at the bar. Return timing is illustrative
-and adds no simulated day, stock movement or extra cost: transport already charges
-the round trip. Markers represent shipments, not unique vehicles on actual shifts.
-
-The customer card counts **bars receiving ice**, out of the twelve bar customers.
-Visitor equivalents are a separate, explicitly labeled estimate: demand/sales bags
-times an adjustable visitors-per-bag factor (default 20, purely illustrative).
-They are not simulated people or unique visitors; changing the factor affects no
-forecast, inventory or cost. Header cards show the selected day; the comparison
-table shows whole-season cost and fill. This is an evaluator replay, so latent
-demand is visible here but still never passed to the forecasting models.
-
-Existing older route logs omit opening-pipeline shipments; the replay flags that
-limitation. A fresh `make run` includes these routes without changing policy costs.
-If WebGL2 is unavailable, the replay falls back to its 2D view.
-
-The **2D analysis** view also shows Palma and Alcúdia dispatches, daily production
-limits, unused production capacity and ice still in transit from each depot.
-Unused capacity is **not depot inventory**: no depot stock balance is modeled.
-Network charts track total ice at bars/in transit, service, vehicle use and daily costs.
-These figures cover the whole network regardless of the selected bar.
-
-Efficiency has several dimensions, not one score:
-
-| Measure | Definition |
+| Module under `src/ice_network/` | Responsibility |
 |---|---|
-| Daily fill rate | Bags sold / demand; compare against the service target |
-| Outbound truck load | Dispatched bags / (trips × truck capacity); empty returns excluded |
-| Fleet use | Dispatched trips / available daily trip slots |
-| Production use | Dispatched bags / combined daily production limit |
-| Ice yield to date | Cumulative sales / (sales + melting + overflow); remaining stock excluded |
-| Cost per sold bag to date | Cumulative replenishment cost, including lost-sales penalties, / sales |
+| `world.py`, `demand.py` | Mallorca locations, constraints and seeded demand |
+| `simulator.py` | Inventory, melting, pipeline, censoring and ice conservation |
+| `forecast.py` | Past-only reconstruction and probabilistic forecasts |
+| `optimize.py`, `policies.py` | Scenario MILP and simpler ordering rules |
+| `backtest.py` | Rolling replay and separate forecast/decision evaluation |
+| `plots.py`, `cli.py` | Figures and command-line entry points |
+| `visualize.py`, `web/` | Offline replay, 2D charts and Three.js scene |
 
-Undefined ratios appear as gaps or dashes. Low melting or high truck load alone
-does not establish a good policy: service and total cost still matter. Every daily
-cost component reconciles with the backtest summary. Opening-pipeline trips are not
-charged again, but their ice is included in transit until receipt.
-
-## Read the code in ten minutes
-
-All modules are under `src/ice_network/`:
-
-| Module | What to look for |
-|---|---|
-| `world.py`, `demand.py` | Coordinates, constraints, seeded exogenous demand |
-| `simulator.py` | Atomic validation, pipeline, censoring, conservation |
-| `forecast.py` | Past-only reconstruction, seasonal distribution, boosted hurdle |
-| `optimize.py`, `policies.py` | Scenario MILP and three simpler ordering rules |
-| `backtest.py` | Policy-specific histories, paired worlds, evaluator-only truth |
-| `plots.py`, `cli.py` | Small plotting and command-line wrappers |
-| `visualize.py`, `web/` | Read-only replay export, 2D SVG charts, 3D scene |
-
-No notebooks or framework glue. Tests cover reproducibility, censoring, the ice ledger,
-cut-off/lead times, forecast leakage, quantile ordering, MILP feasibility and replay costs.
-
-## The daily contract
-
-1. Melt yesterday's closing stock: 2.5% plus 0.4 percentage points per degree above
-   25°C, capped at 15%. Stock uses bag-equivalents; only whole bags can be sold.
-   Fractional remnants stay in the ledger.
-2. Receive shipments. Reserved storage includes **all** pipeline orders, so even
-   zero future sales cannot cause overflow. This is deliberately conservative.
-3. Order using morning temperature and past observations. Orders by 10:00 depart
-   today; later orders depart tomorrow. Palma has a one-day fulfillment lead time;
-   Alcudia has two. Production and fleet capacity are reserved on departure day.
-4. Demand arrives; sales are `min(demand, floor(stock))`. A sell-out is observable;
-   whether additional customers existed is hidden from forecasting code.
-
-Demand includes weekday/holiday effects, a tourism peak, correlated weather, rain,
-parties, cruises and three intermittent bars. Future events are hidden. Weather
-forecasts decay the known morning anomaly toward climatology, never reading future
-temperatures. June 24 and August 15 form a simplified synthetic holiday calendar.
-
-Both models share the generator's smooth calendar/temperature normalization as a
-prespecified structural assumption. This is a controlled demonstration, not evidence
-of discovering seasonality from real data. Neither receives per-bar demand parameters,
-future sales/events or latent demand.
-
-Each trip serves one bar, costs €12 plus €0.32/km, and carries up to 360 bags. Orders
-use 20-bag packs and a 40-bag MOQ per depot/bar delivery. Six trucks provide three
-dispatch slots each per day; depot production is 2,100/1,500 bags per day. Route costs
-use twice a 1.3× great-circle distance approximation. There is no multi-stop VRP,
-driving-time schedule, overnight positioning or inter-depot repositioning cost.
-Fulfillment lead time does not occupy a truck for multiple days. Refrigerated transit
-has no shrinkage. The ledger checks, per bar:
-
-```text
-opening stock + opening pipeline + new orders
-  = sales + melting + overflow waste + closing stock + closing pipeline
-```
-
-## Forecasts and decisions
-
-**Reconstruction.** Match each sell-out to up to eight earlier uncensored days for
-the same bar and weekday/weekend class in a 56-day window, ranked by temperature
-distance. Normalize season/heat, take their mean, and lower-bound it by sales.
-Without donors, retain the observed lower bound. Earlier reconstructions never use
-later donors. Large demands remain underrepresented. An alternative is a censored
-negative-binomial hurdle likelihood: use probability mass for uncensored observations
-and survival probability above available stock for sell-outs. Stockout timestamps
-would help; an entirely unobserved tail still requires assumptions.
-
-**Seasonal baseline.** Group means plus empirical residual quantiles after calendar
-normalization, preserving the mass at zero. **Boosted hurdle.** A gradient-boosted
-occurrence classifier and eight positive-demand quantile regressors; transform the
-conditional CDF through the hurdle probability. Sorting prevents quantile crossings.
-Both publish P10/P50/P90/P95. MAE/RMSE use P50, a median rather than a mean; pinball
-loss and coverage assess the distribution. Inclusive coverage at a discrete zero
-atom can exceed its nominal quantile even for a calibrated distribution.
-
-**Rules.** Naive uses the last seven days of censored sales. Median uses P50 (the
-requested “forecast-mean” policy). Quantile uses the target quantile. All target a
-lead-time-plus-one-day stock position, subtract pipeline stock, allow for melting,
-round to packs and obey the same constraints. Greedy allocation prioritizes lowest
-days of cover, then nearby depots. Summing daily quantiles is a stock-buffer heuristic,
-not a quantile of total lead-time demand.
-
-**MILP.** Integer case counts, delivery indicators and route trip counts are shared
-across nine stratified scenarios over four days. Scenario balances apply melting
-and timed receipts; binary complementarity forbids simultaneous closing stock and
-lost demand. Production, fleet, MOQ and conservative storage constraints are hard.
-The objective is transport + expected holding + melting + lost-sales cost. A soft
-aggregate fill constraint on days reachable by new deliveries penalizes unmet service
-by another €24/bag. Slack is reported, never presented as achieved service. The target
-is not a per-bar or per-day guarantee.
-
-Only today's dispatch is optimized; there are no future replenishment recourse
-decisions in the four-day horizon. Draws ignore cross-bar/temporal dependence and use
-a small, bounded tail approximation. The optimizer replans tomorrow. Single-thread
-SCIP uses a deterministic 2,000-node budget and 1% gap tolerance; every day's status,
-gap and slack are saved. No feasible incumbent is an error, not a silent fallback.
-
-## Backtest and findings
-
-The May–September 2025 world has 153 days: 49 shared warmup days and 104 evaluated
-days. Each policy starts with identical stock/pipeline, replays the same demand and
-weather, and retrains weekly on its own observations through yesterday. The known
-closing date suppresses forecasts beyond the evaluation window. No new delivery
-remains in transit at the end.
-
-The headline's accuracy axis comes from a **separate common-history experiment** at
-rolling horizons 0, 1 and 2. Policy forecasts also have their own metrics. Better
-availability changes training data, so policy-specific errors cannot be interpreted
-as a controlled forecaster ranking.
-
-| Policy / forecaster | Total cost | Fill rate | Lost bags | Melted bags | Trips |
-|---|---:|---:|---:|---:|---:|
-| Naive | €642,706 | 56.7% | 51,163 | 627 | 762 |
-| Median / seasonal | €288,232 | 82.3% | 20,941 | 1,181 | 956 |
-| P95 / seasonal | €103,405 | 96.2% | 4,532 | 6,376 | 1,022 |
-| Optimizer / seasonal | €105,271 | 96.1% | 4,646 | 7,131 | 1,025 |
-| Median / hurdle | €336,082 | 78.9% | 24,923 | 1,026 | 968 |
-| P95 / hurdle | €111,130 | 95.6% | 5,237 | 6,272 | 1,060 |
-| Optimizer / hurdle | €105,553 | 96.1% | 4,660 | 7,301 | 1,034 |
-
-Cost is **incremental replenishment cost**, not full business accounting: transport,
-€0.015 per closing bag-day, €1.20 per melted/wasted bag, and €12 per lost sale.
-Sold ice procurement/revenue are represented through the lost-contribution penalty,
-not charged separately. Remaining ice is carried at book value and reported rather
-than treated as a season-end loss. Planning slack penalties are excluded from realized
-cost. Fill rate is total bags sold / total bags demanded.
-
-The reproducible audit explains why the hoped-for reversal did not appear:
-
-- The baseline has lower one-day MAE **and** mean pinball loss (13.77 versus 14.59).
-  There is no clear tradeoff between a better center and a worse distribution here.
-- Reconstruction raises historical sales from 75,282 to 113,704 estimated bags,
-  but truth is 147,041. Common-history P95 coverage is only 67.6%/68.6%: similar
-  uncensored days cannot recover all the missing tail.
-- About 61% of the seasonal optimizer's lost bags occur on party/cruise days,
-  which are unknown at ordering time. Better availability improves training data
-  but cannot make surprise demand disappear.
-- The P95 rule beats the MILP by €1,867: 114 fewer lost sales and about 755 fewer
-  melted bags. A four-day model with only current orders can overstock; nine
-  independent scenarios miss joint extremes. This is a plausible mechanism,
-  not an ablation proving which approximation caused the gap.
-
-`artifacts/` includes totals, both kinds of forecast scores, daily evaluator ledgers,
-shipments, solver diagnostics, event losses, configuration, versions and three plots.
-Compact results, main figures and a replay screenshot are committed; generated
-ledgers and the self-contained HTML replay are ignored and rebuilt by the CLI.
-Repeat runs in the pinned environment should match; bitwise agreement across CPU
-architectures or different solver versions is not guaranteed.
-
-Validation: sixteen Python tests and Ruff pass; the tests also pass in the Docker
-build. The original season reproduced exactly across native and Docker runs. Adding
-the visualization preserves policy totals, forecasts and daily ledgers exactly.
-Browser checks cover data reconciliation, controls, playback, orbiting, mobile layout,
-offline use and the WebGL fallback. To run the optional browser check:
-
-```sh
-npm install --prefix /tmp/ice-browser-qa playwright@1.55.1
-/tmp/ice-browser-qa/node_modules/.bin/playwright install chromium
-NODE_PATH=/tmp/ice-browser-qa/node_modules node tests/replay.browser.cjs
-```
-
-Node/Playwright are needed only for this browser test, not for generating or opening
-the replay. `ICE_CHROMIUM_PATH` can point the test at an existing Chromium executable.
+Sixteen Python tests cover censoring, conservation, forecast leakage, MILP feasibility,
+timing and replay accounting. Ruff checks formatting and lint. Optional browser
+checks cover controls, offline use, mobile layouts and 2D fallback; instructions
+are in the [validation notes](docs/METHODOLOGY.md#backtest-and-findings).
 
 ## What I would do next in production
 
-Start with real sales, availability, stockout timestamps, weather forecasts as issued
-and road travel times. Estimate reconstruction uncertainty. Model uncertain lead
-times, shared heat/event shocks, multi-echelon depot stock and future replenishment
-decisions. Add operator overrides, exception handling for broken freezers/late trucks,
-and audit logs for every override. Test more seasons and cost/service sensitivities
-before trusting small rankings; replace dispatch slots with actual vehicle shifts.
-
-References: [PySCIPOpt installation](https://pyscipopt.readthedocs.io/en/latest/install.html)
-and [quantile boosting](https://scikit-learn.org/1.5/modules/generated/sklearn.ensemble.HistGradientBoostingRegressor.html).
+Start with real sales, availability and stockout timestamps, issued weather forecasts
+and road travel times. Model uncertain lead times and demand shared across bars,
+then add multi-echelon depot inventory and future replenishment decisions. Give
+operators overrides, exception handling for late trucks or broken freezers, and
+audit logs. Test multiple seasons and cost assumptions before trusting small rankings.
