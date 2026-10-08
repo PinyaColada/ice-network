@@ -10,3 +10,4 @@ artifacts/**
 !artifacts/forecast_metrics.csv
 !artifacts/result.json
 !artifacts/investigation.json
+!artifacts/replay-3d.png

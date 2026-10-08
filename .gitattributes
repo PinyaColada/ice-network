@@ -1,0 +1,2 @@
+# Preserve whitespace inside upstream shader strings; keep generated vendor code out of reviews.
+src/ice_network/web/three.min.js -whitespace linguist-vendored=true

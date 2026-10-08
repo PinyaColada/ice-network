@@ -165,7 +165,8 @@ def replay(c: Config, truth: pd.DataFrame, out: Path) -> pd.DataFrame:
                 "conservation_error": balance,
             }
         )
-        orders.extend({"run": run, **asdict(s)} for s in shipments)
+        # Include opening-pipeline routes for the replay, but exclude their costs above.
+        orders.extend({"run": run, **asdict(s)} for s in sim.shipments if s.arrival >= c.warmup)
         ledgers.append(ledger)
         print(
             f"  cost €{summaries[-1]['total_cost']:,.0f}; fill rate {summaries[-1]['service']:.1%}",

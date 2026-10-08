@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ice network · Mallorca replay</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23177977'/%3E%3Cpath d='m20 7 12 7v13l-12 7-12-7V14zM8 14l12 7 12-7M20 21v13' stroke='white' fill='none' stroke-width='2'/%3E%3C/svg%3E">
+<style>/* REPLAY_CSS */</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="brand"><span class="cube" aria-hidden="true">◇</span><strong>ice network</strong><span class="divider"></span><span>Mallorca, on ice.</span></div>
+  <div class="season"><i></i> Synthetic season <span id="season-year"></span></div>
+</header>
+<main>
+  <section class="toolbar" aria-label="Replay controls">
+    <div><span class="eyebrow">THE REPLENISHMENT REPLAY</span><h1>A small island. A finite freezer.</h1></div>
+    <div class="view-toggle" aria-label="View"><button id="view-2d" aria-pressed="false">2D · analysis</button><button id="view-3d" class="active" aria-pressed="true">3D · island</button></div>
+  </section>
+  <section class="controls">
+    <label class="policy-control">Replenishment policy<select id="policy"></select></label>
+    <div class="play-controls"><button id="previous" aria-label="Previous day">‹</button><button id="play" aria-label="Play season">Play</button><button id="next" aria-label="Next day">›</button></div>
+    <div class="scrubber"><div><strong id="date"></strong><span id="day-label"></span></div><input id="timeline" type="range" min="0" value="0" aria-label="Replay day"></div>
+    <label class="speed-control">Speed<select id="speed"><option value="1000">1×</option><option value="450">2×</option><option value="180">5×</option></select></label>
+    <div class="weather"><span id="temperature"></span><small>Morning temperature</small></div>
+  </section>
+  <section class="kpis" aria-label="Network totals for selected day">
+    <div><span>Ice in the freezers</span><strong id="stock-kpi"></strong><small>Closing stock · bags</small></div>
+    <div><span>Ice sold today</span><strong id="sales-kpi"></strong><small id="demand-kpi"></small></div>
+    <div><span>Demand left unserved</span><strong id="lost-kpi" class="rust"></strong><small id="service-kpi"></small></div>
+    <div><span>Bar customers</span><strong id="bars-kpi"></strong><small id="deliveries-kpi"></small></div>
+    <div><span>Ice melted today</span><strong id="melt-kpi"></strong><small>Bag-equivalents lost in storage</small></div>
+  </section>
+  <section id="workspace" class="workspace mode-3d">
+    <article class="island panel">
+      <div class="panel-title"><div><span class="eyebrow">THE NETWORK</span><h2 id="map-title">An island of little freezers</h2></div><button id="reset-camera" class="quiet">Reset view</button></div>
+      <div id="stage"><div id="scene-labels"></div><div id="webgl-fallback" hidden>3D is unavailable in this browser. The 2D map and charts still work.</div><svg id="map" viewBox="0 0 760 470" aria-label="Map of bars and depot routes"></svg></div>
+      <div class="map-legend"><span><i class="dot teal"></i> Closing ice</span><span><i class="dot rust-bg"></i> Lost sales</span><span><i class="square"></i> Depot</span><span class="map-help" id="map-help">Drag to orbit · scroll to zoom · select a bar</span></div>
+      <div class="map-note">Column height = bags; wireframe = capacity. Coastline and routes are schematic. Truck markers show shipment progress, not physical fleet positions.</div>
+      <div id="route-summary" class="route-summary"></div>
+    </article>
+    <aside class="bar-panel panel">
+      <span class="eyebrow">ZOOM INTO A CHIRINGUITO</span>
+      <label for="bar" class="sr-only">Selected bar</label><select id="bar"></select>
+      <div id="bar-badge" class="badge"></div>
+      <div class="stock-heading"><span>Closing freezer</span><strong id="bar-stock"></strong></div>
+      <div class="capacity-track"><div id="capacity-fill"></div></div>
+      <dl id="bar-facts"></dl>
+      <div class="bar-list" id="bar-list" aria-label="Select a bar"></div>
+    </aside>
+    <article class="panel chart-panel forecast-panel"><div class="panel-title"><div><span class="eyebrow">DEMAND & SALES</span><h2>What the till doesn't tell you</h2></div><span id="forecast-status" class="chart-caption"></span></div><div class="chart-legend"><span class="key actual">True demand</span><span class="key sold">Sales</span><span class="key forecast">P50</span><span class="key band">P10–P90</span><span class="key p95">P95</span></div><div id="forecast-chart" class="chart"></div><div id="forecast-readout" class="readout"></div><p class="chart-note">Each forecast was issued that morning from earlier sales. Truth is visible only in this evaluator replay.</p></article>
+    <article class="panel chart-panel inventory-panel"><div class="panel-title"><div><span class="eyebrow">INVENTORY</span><h2>In, out, and quietly melting</h2></div><span class="chart-caption">Bags / day</span></div><div class="chart-legend"><span class="key sold">Closing stock</span><span class="key delivery">Received</span><span class="key lost">Melted</span><span class="key actual">Capacity</span></div><div id="inventory-chart" class="chart"></div><div id="inventory-readout" class="readout"></div><p class="chart-note">Morning melt → receipts → orders → sales. Stock includes fractional bag-equivalents.</p></article>
+    <article class="panel chart-panel customer-panel"><div class="panel-title"><div><span class="eyebrow">VISITOR EQUIVALENTS · ESTIMATE</span><h2>How many beachgoers is that?</h2></div><label class="conversion">Visitors / bag<input id="visitors-per-bag" type="number" min="1" max="200" step="1" value="20"></label></div><div class="chart-legend"><span class="key actual">Demand equivalent</span><span class="key sold">Served equivalent</span></div><div id="customer-chart" class="chart"></div><div id="customer-readout" class="readout"></div><p class="chart-note">Illustrative conversion only: bags × visitors per bag. These are not simulated arrivals or unique people, and do not change the backtest.</p></article>
+    <article class="panel results-panel"><span class="eyebrow">THE WHOLE SEASON</span><h2>Keep the result in view.</h2><p id="result-caption"></p><div id="policy-results"></div><p class="chart-note">Cost and fill below cover the entire evaluation period; the cards above show only the selected day.</p></article>
+  </section>
+  <footer><span>Seed <b id="seed"></b> · read-only replay · all assets embedded · Three.js, MIT</span><span>Good ice accounting. Questionable bar names.</span></footer>
+</main>
+<script id="replay-data" type="application/json">/* REPLAY_DATA */</script>
+<!-- /* THREE_LICENSE */ -->
+<script>/* THREE_BUNDLE */</script>
+<script>/* REPLAY_JS */</script>
+<script>/* SCENE_JS */</script>
+</body></html>

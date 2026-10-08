@@ -21,6 +21,9 @@ ice-network = "ice_network.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+ice_network = ["web/*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

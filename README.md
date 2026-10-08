@@ -45,6 +45,40 @@ Change the seed or target without overwriting the published results:
 `make simulate` generates only the world, observations and simulator plots. Targets
 between 50% and 95% are supported. Defaults, costs and limits live in `world.py`.
 
+## Explore the island
+
+`make run` now also creates **`artifacts/replay.html`**. Open it directly in a modern
+browser; the data, charts and Three.js engine are embedded, so it works offline.
+No server, CDN or Node installation is needed. To visualize an existing completed
+backtest without running the models again:
+
+```sh
+make visualize
+# Or: .venv/bin/ice-network visualize --output artifacts/alternative
+```
+
+![The interactive 3D replay](artifacts/replay-3d.png)
+
+Switch between **2D analysis** and the **3D island**, play or scrub through the season,
+and select any policy and bar. Charts show true demand, censored sales, same-day
+P10/P50/P90/P95 forecasts, receipts, closing stock, melting and storage capacity.
+Click a chart to select its day. The naive policy correctly has no forecast band.
+The 3D scene supports orbit/zoom; stock columns share a bags-to-height scale and
+wireframes show capacity. Delivery paths use the saved depot/bar assignments and
+lead times. The coastline and moving trucks are illustrative, not road/GPS tracks.
+
+The customer card counts **bars receiving ice**, out of the twelve bar customers.
+Visitor equivalents are a separate, explicitly labeled estimate: demand/sales bags
+times an adjustable visitors-per-bag factor (default 20, purely illustrative).
+They are not simulated people or unique visitors; changing the factor affects no
+forecast, inventory or cost. Header cards show the selected day; the comparison
+table shows whole-season cost and fill. This is an evaluator replay, so latent
+demand is visible here but still never passed to the forecasting models.
+
+Existing older route logs omit opening-pipeline shipments; the replay flags that
+limitation. A fresh `make run` includes these routes without changing policy costs.
+If WebGL2 is unavailable, the replay falls back to its 2D view.
+
 ## Read the code in ten minutes
 
 All modules are under `src/ice_network/`:
@@ -57,6 +91,7 @@ All modules are under `src/ice_network/`:
 | `optimize.py`, `policies.py` | Scenario MILP and three simpler ordering rules |
 | `backtest.py` | Policy-specific histories, paired worlds, evaluator-only truth |
 | `plots.py`, `cli.py` | Small plotting and command-line wrappers |
+| `visualize.py`, `web/` | Read-only replay export, 2D SVG charts, 3D scene |
 
 No notebooks or framework glue. Tests cover reproducibility, censoring, the ice ledger,
 cut-off/lead times, forecast leakage, quantile ordering, MILP feasibility and replay costs.
@@ -185,13 +220,25 @@ The reproducible audit explains why the hoped-for reversal did not appear:
 
 `artifacts/` includes totals, both kinds of forecast scores, daily evaluator ledgers,
 shipments, solver diagnostics, event losses, configuration, versions and three plots.
-Compact results and two figures are committed; large generated ledgers are ignored.
+Compact results, main figures and a replay screenshot are committed; generated
+ledgers and the self-contained HTML replay are ignored and rebuilt by the CLI.
 Repeat runs in the pinned environment should match; bitwise agreement across CPU
 architectures or different solver versions is not guaranteed.
 
-Validation: eleven tests and Ruff pass locally and the tests also pass during the
-Docker build. All eleven CSV outputs match exactly across two native runs and a
-full Docker replay; all three plots are byte-identical in those runs.
+Validation: fourteen Python tests and Ruff pass; the tests also pass in the Docker
+build. The original season reproduced exactly across native and Docker runs. Adding
+the visualization preserves policy totals, forecasts and daily ledgers exactly.
+Browser checks cover data reconciliation, controls, playback, orbiting, mobile layout,
+offline use and the WebGL fallback. To run the optional browser check:
+
+```sh
+npm install --prefix /tmp/ice-browser-qa playwright@1.55.1
+/tmp/ice-browser-qa/node_modules/.bin/playwright install chromium
+NODE_PATH=/tmp/ice-browser-qa/node_modules node tests/replay.browser.cjs
+```
+
+Node/Playwright are needed only for this browser test, not for generating or opening
+the replay. `ICE_CHROMIUM_PATH` can point the test at an existing Chromium executable.
 
 ## What I would do next in production
 
