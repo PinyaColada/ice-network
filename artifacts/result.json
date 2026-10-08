@@ -1,0 +1,15 @@
+{
+  "accuracy_metric": "MAE, one-day horizon, common incumbent history",
+  "best_accuracy": "seasonal",
+  "best_qualifying_decision": "seasonal",
+  "target": 0.95,
+  "reversal_observed": false,
+  "message": "The lowest-MAE forecaster also selects the cheapest qualifying optimizer.",
+  "versions": {
+    "numpy": "2.2.6",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.6.1",
+    "pyscipopt": "5.5.0"
+  },
+  "python": "3.11.17"
+}

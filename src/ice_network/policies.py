@@ -35,6 +35,8 @@ def order(
     for b in priority:
         for d in np.argsort(sim.km[:, b], kind="stable"):
             lead = DEPOTS[d].lead
+            if sim.day + lead >= c.days:
+                continue
             rate = melt_rate(float(forecast.frame.temperature.iloc[0])) if forecast else 0.04
             target = sum(predictions[h, b] / (1 - rate) ** h for h in range(lead + 1))
             desired = max(0, ceil((target - position[b]) / c.pack) * c.pack)

@@ -1,0 +1,15 @@
+{
+  "seed": 20261008,
+  "observed_bags": 75282,
+  "reconstructed_bags": 113703.68396920242,
+  "true_bags_evaluator_only": 147041,
+  "solver_max_gap": 0.0096986623093602,
+  "solver_status_counts": {
+    "optimal": 153,
+    "gaplimit": 55
+  },
+  "positive_slack_days": {
+    "optimizer/hurdle": 42,
+    "optimizer/seasonal": 50
+  }
+}

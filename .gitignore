@@ -3,8 +3,10 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
-artifacts/*.csv
-artifacts/*.json
-artifacts/*.png
+artifacts/**
 !artifacts/headline.png
 !artifacts/simulator.png
+!artifacts/policies.csv
+!artifacts/forecast_metrics.csv
+!artifacts/result.json
+!artifacts/investigation.json

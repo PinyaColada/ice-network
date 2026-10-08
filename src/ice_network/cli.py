@@ -13,7 +13,7 @@ from ice_network.world import Config
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["simulate"])
+    parser.add_argument("command", choices=["simulate", "run"])
     parser.add_argument("--output", type=Path, default=Path("artifacts"))
     parser.add_argument("--seed", type=int, default=20261008)
     parser.add_argument("--days", type=int, default=153)
@@ -32,6 +32,10 @@ def main() -> None:
         f"sell-out rate: {observed.stockout.mean():.1%}",
         flush=True,
     )
+    if args.command == "run":
+        from ice_network.backtest import run
+
+        run(c, truth, observed, args.output)
 
 
 if __name__ == "__main__":
