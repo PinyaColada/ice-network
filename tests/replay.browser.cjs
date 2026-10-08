@@ -11,6 +11,31 @@ const { chromium } = require("playwright");
     args: ["--no-sandbox", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
   });
   try {
+    const assertMapVisible = async (target) => {
+      const layout = await target.evaluate(() => {
+        const map = document.querySelector("#map"),
+          stage = document.querySelector("#stage");
+        const canvas = stage.querySelector("canvas");
+        const m = map.getBoundingClientRect(),
+          s = stage.getBoundingClientRect();
+        return {
+          hiddenCanvas: !canvas || getComputedStyle(canvas).display === "none",
+          inside:
+            m.width > 0 &&
+            m.height > 0 &&
+            m.top >= s.top - 1 &&
+            m.left >= s.left - 1 &&
+            m.bottom <= s.bottom + 1 &&
+            m.right <= s.right + 1,
+          bars: map.querySelectorAll("[data-bar]").length,
+          scroll: stage.scrollTop,
+        };
+      });
+      assert(layout.hiddenCanvas, "3D canvas must not occupy space in 2D mode");
+      assert(layout.inside, "SVG map must be inside its clipped stage before any auto-scrolling");
+      assert.equal(layout.bars, 12);
+      assert.equal(layout.scroll, 0);
+    };
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
     const errors = [],
       external = [];
@@ -107,6 +132,7 @@ const { chromium } = require("playwright");
     assert.match(await page.locator("#forecast-status").innerText(), /no forecast/);
     assert.equal(await page.locator("#forecast-chart polygon").count(), 0);
     await page.click("#view-2d");
+    await assertMapVisible(page);
     assert(await page.locator("#analytics").isVisible());
     const metrics = await page.evaluate(() => {
       const a = iceReplay,
@@ -178,6 +204,7 @@ const { chromium } = require("playwright");
 
     await page.click("#view-2d");
     await page.screenshot({ path: path.join(output, "replay-2d.png"), fullPage: true });
+    await assertMapVisible(page);
     await page.locator("#analytics").screenshot({ path: path.join(output, "efficiency.png") });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.click("#view-3d");
@@ -186,6 +213,7 @@ const { chromium } = require("playwright");
     assert(await page.evaluate(() => document.body.scrollWidth <= innerWidth));
     await page.screenshot({ path: path.join(output, "replay-mobile.png"), fullPage: true });
     await page.click("#view-2d");
+    await assertMapVisible(page);
     await page.waitForFunction(
       () => document.querySelector("#cost-chart svg").viewBox.baseVal.width < 390,
     );
@@ -195,6 +223,20 @@ const { chromium } = require("playwright");
       .screenshot({ path: path.join(output, "efficiency-mobile.png") });
     assert.deepEqual(errors, []);
     assert.deepEqual(external, []);
+
+    const direct = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    direct.on("pageerror", (error) => errors.push(error.message));
+    await direct.goto(pathToFileURL(path.join(output, "replay.html")).href + "#2d");
+    await direct.waitForFunction(() => iceReplay.state.scene);
+    await assertMapVisible(direct);
+    await direct.locator(".island").screenshot({ path: path.join(output, "map-fixed.png") });
+    await direct.reload();
+    await direct.waitForFunction(() => iceReplay.state.scene);
+    await assertMapVisible(direct);
+    await direct.selectOption("#policy", "optimizer/hurdle");
+    await assertMapVisible(direct);
+    await direct.close();
+    assert.deepEqual(errors, []);
 
     const fallback = await browser.newPage();
     await fallback.addInitScript(() => {
@@ -207,6 +249,7 @@ const { chromium } = require("playwright");
     await fallback.waitForFunction(() => iceReplay.state.view === "2d");
     assert(await fallback.locator("#webgl-fallback").isVisible());
     assert(await fallback.locator("#view-3d").isDisabled());
+    await assertMapVisible(fallback);
     console.log(
       "Replay QA passed: data, controls, playback, 2D/3D, mobile, offline, WebGL fallback.",
     );

@@ -16,6 +16,9 @@
     document.getElementById("view-3d").disabled = true;
     return;
   }
+  // Three.js creates an inline display:block, which overrides our 2D/3D CSS switch.
+  // Let the stylesheet own visibility so a hidden canvas cannot push the SVG out of view.
+  renderer.domElement.style.removeProperty("display");
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFSoftShadowMap;
