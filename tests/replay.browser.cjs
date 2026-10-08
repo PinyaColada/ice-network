@@ -107,6 +107,29 @@ const { chromium } = require("playwright");
     assert.match(await page.locator("#forecast-status").innerText(), /no forecast/);
     assert.equal(await page.locator("#forecast-chart polygon").count(), 0);
     await page.click("#view-2d");
+    assert(await page.locator("#analytics").isVisible());
+    const metrics = await page.evaluate(() => {
+      const a = iceReplay,
+        departures = a.run().orders.filter((o) => o.departure === a.day());
+      const trips = departures.reduce((s, o) => s + o.trips, 0);
+      const bags = departures.reduce((s, o) => s + o.bags, 0);
+      const palma = departures.filter((o) => o.depot === 0).reduce((s, o) => s + o.bags, 0);
+      const sales = a.rows().reduce((s, r) => s + r.sales, 0);
+      const demand = a.rows().reduce((s, r) => s + r.latent_demand, 0);
+      return {
+        palma: a.number(palma),
+        unused: a.number(a.data.depots[0].production - palma),
+        fill: demand ? a.number((sales / demand) * 100, 1) + "%" : "—",
+        load: trips
+          ? a.number((bags / (trips * a.data.config.truck_capacity)) * 100, 1) + "%"
+          : "—",
+      };
+    });
+    assert.equal(await page.locator("#depot-0-stats strong").nth(0).innerText(), metrics.palma);
+    assert.equal(await page.locator("#depot-0-stats strong").nth(2).innerText(), metrics.unused);
+    assert.equal(await page.locator("#eff-fill").innerText(), metrics.fill);
+    assert.equal(await page.locator("#eff-load").innerText(), metrics.load);
+    assert((await page.locator('#efficiency-chart [data-series="truck-load"]').count()) > 0);
     await page.locator('#map [data-bar="10"]').click();
     assert.equal(await page.locator("#bar").inputValue(), "10");
     await page.locator("#forecast-chart .hit-zone").click({ position: { x: 50, y: 50 } });
@@ -125,6 +148,11 @@ const { chromium } = require("playwright");
     await page.click("#play");
     await page.waitForFunction(() => iceReplay.state.timer === null);
     assert.equal(await page.evaluate(() => iceReplay.state.index), last);
+    assert.equal(await page.locator("#eff-load").innerText(), "—");
+    assert(
+      (await page.locator('#efficiency-chart [data-series="truck-load"]').count()) > 0,
+      "a no-departure day must not erase the rest of the truck-load history",
+    );
 
     await page.selectOption("#policy", "quantile/seasonal");
     await page.selectOption("#bar", "0");
@@ -150,12 +178,21 @@ const { chromium } = require("playwright");
 
     await page.click("#view-2d");
     await page.screenshot({ path: path.join(output, "replay-2d.png"), fullPage: true });
+    await page.locator("#analytics").screenshot({ path: path.join(output, "efficiency.png") });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.click("#view-3d");
     await page.locator("#reset-camera").click();
     await page.waitForTimeout(300);
     assert(await page.evaluate(() => document.body.scrollWidth <= innerWidth));
     await page.screenshot({ path: path.join(output, "replay-mobile.png"), fullPage: true });
+    await page.click("#view-2d");
+    await page.waitForFunction(
+      () => document.querySelector("#cost-chart svg").viewBox.baseVal.width < 390,
+    );
+    assert(await page.evaluate(() => document.body.scrollWidth <= innerWidth));
+    await page
+      .locator("#analytics")
+      .screenshot({ path: path.join(output, "efficiency-mobile.png") });
     assert.deepEqual(errors, []);
     assert.deepEqual(external, []);
 

@@ -84,6 +84,28 @@ Existing older route logs omit opening-pipeline shipments; the replay flags that
 limitation. A fresh `make run` includes these routes without changing policy costs.
 If WebGL2 is unavailable, the replay falls back to its 2D view.
 
+The **2D analysis** view also shows Palma and Alcúdia dispatches, daily production
+limits, unused production capacity and ice still in transit from each depot.
+Unused capacity is **not depot inventory**: no depot stock balance is modeled.
+Network charts track total ice at bars/in transit, service, vehicle use and daily costs.
+These figures cover the whole network regardless of the selected bar.
+
+Efficiency has several dimensions, not one score:
+
+| Measure | Definition |
+|---|---|
+| Daily fill rate | Bags sold / demand; compare against the service target |
+| Outbound truck load | Dispatched bags / (trips × truck capacity); empty returns excluded |
+| Fleet use | Dispatched trips / available daily trip slots |
+| Production use | Dispatched bags / combined daily production limit |
+| Ice yield to date | Cumulative sales / (sales + melting + overflow); remaining stock excluded |
+| Cost per sold bag to date | Cumulative replenishment cost, including lost-sales penalties, / sales |
+
+Undefined ratios appear as gaps or dashes. Low melting or high truck load alone
+does not establish a good policy: service and total cost still matter. Every daily
+cost component reconciles with the backtest summary. Opening-pipeline trips are not
+charged again, but their ice is included in transit until receipt.
+
 ## Read the code in ten minutes
 
 All modules are under `src/ice_network/`:
@@ -230,7 +252,7 @@ ledgers and the self-contained HTML replay are ignored and rebuilt by the CLI.
 Repeat runs in the pinned environment should match; bitwise agreement across CPU
 architectures or different solver versions is not guaranteed.
 
-Validation: fourteen Python tests and Ruff pass; the tests also pass in the Docker
+Validation: sixteen Python tests and Ruff pass; the tests also pass in the Docker
 build. The original season reproduced exactly across native and Docker runs. Adding
 the visualization preserves policy totals, forecasts and daily ledgers exactly.
 Browser checks cover data reconciliation, controls, playback, orbiting, mobile layout,

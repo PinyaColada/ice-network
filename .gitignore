@@ -11,3 +11,4 @@ artifacts/**
 !artifacts/result.json
 !artifacts/investigation.json
 !artifacts/replay-3d.png
+!artifacts/efficiency.png

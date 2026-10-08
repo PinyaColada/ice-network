@@ -25,6 +25,7 @@
     );
     run.byDay = Object.groupBy(run.rows, (row) => row.day);
     run.byBar = Object.groupBy(run.rows, (row) => row.bar);
+    run.byDepot = Object.groupBy(run.operations.depots, (row) => row.depot);
   }
   const state = {
     run: data.runs["quantile/seasonal"] ? "quantile/seasonal" : Object.keys(data.runs)[0],
@@ -144,6 +145,8 @@
   }
   function setView(view) {
     state.view = view;
+    history.replaceState(null, "", `#${view}`);
+    $("analytics").hidden = view !== "2d";
     $("workspace").className = `workspace mode-${view}`;
     for (const v of ["2d", "3d"]) {
       $(`view-${v}`).classList.toggle("active", v === view);
@@ -157,6 +160,7 @@
         : "Select a bar to inspect its season";
     if (state.scene) state.scene.resize();
     renderMap();
+    renderOperations();
   }
   function renderMap() {
     const xy = (p) => {
@@ -209,7 +213,7 @@
     const vals = series
       .flatMap((r) => lines.map((l) => l.value(r)).concat(options.band ? options.band(r) : []))
       .filter((v) => v !== null && Number.isFinite(v));
-    const max = Math.max(1, ...vals, options.capacity || 0) * 1.09;
+    const max = options.max || Math.max(1, ...vals, options.capacity || 0) * 1.09;
     const x = (i) => L + (i / Math.max(1, series.length - 1)) * innerW,
       y = (v) => H - B - (v / max) * innerH;
     let html = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(options.title || id)}">`;
@@ -233,19 +237,33 @@
     if (options.capacity)
       html += `<line x1="${L}" x2="${W - R}" y1="${y(options.capacity)}" y2="${y(options.capacity)}" stroke="#748378" stroke-dasharray="5 4"/>`;
     for (const line of lines) {
-      if (series.some((r) => line.value(r) === null)) continue;
       if (line.bars) {
         const width = Math.max(1, (innerW / series.length) * 0.6);
-        for (const [i, r] of series.entries())
+        for (const [i, r] of series.entries()) {
+          if (line.value(r) === null) continue;
           html += `<rect x="${x(i) - width / 2}" y="${y(line.value(r))}" width="${width}" height="${Math.max(0, y(0) - y(line.value(r)))}" fill="${line.color}" opacity=".45"/>`;
+        }
         continue;
       }
-      const points = series.map((r, i) => `${x(i)},${y(line.value(r))}`).join(" ");
-      if (line.area)
-        html += `<polygon points="${x(0)},${y(0)} ${points} ${x(series.length - 1)},${y(0)}" fill="${line.color}" opacity=".08"/>`;
-      html += `<polyline points="${points}" fill="none" stroke="${line.color}" stroke-width="${line.width || 1.5}" ${line.dash ? `stroke-dasharray="${line.dash}"` : ""}/>`;
+      // A day without demand/departures is an undefined ratio: leave a gap in the line.
+      const segments = [];
+      let segment = [];
+      for (const [i, r] of series.entries()) {
+        if (line.value(r) === null) {
+          if (segment.length) segments.push(segment);
+          segment = [];
+        } else segment.push({ i, value: line.value(r) });
+      }
+      if (segment.length) segments.push(segment);
+      for (const part of segments) {
+        const points = part.map((p) => `${x(p.i)},${y(p.value)}`).join(" ");
+        if (line.area)
+          html += `<polygon points="${x(part[0].i)},${y(0)} ${points} ${x(part.at(-1).i)},${y(0)}" fill="${line.color}" opacity=".08"/>`;
+        html += `<polyline data-series="${esc(line.key || "")}" points="${points}" fill="none" stroke="${line.color}" stroke-width="${line.width || 1.5}" ${line.dash ? `stroke-dasharray="${line.dash}"` : ""}/>`;
+      }
       const selected = series[state.index];
-      html += `<circle cx="${x(state.index)}" cy="${y(line.value(selected))}" r="3" fill="${line.color}" stroke="white" stroke-width="1"/>`;
+      if (line.value(selected) !== null)
+        html += `<circle cx="${x(state.index)}" cy="${y(line.value(selected))}" r="3" fill="${line.color}" stroke="white" stroke-width="1"/>`;
     }
     html += `<line class="cursor-line" x1="${x(state.index)}" x2="${x(state.index)}" y1="${T}" y2="${H - B}"/><rect class="hit-zone" x="${L}" y="0" width="${innerW}" height="${H - B}" fill="transparent"/></svg>`;
     $(id).innerHTML = html;
@@ -300,6 +318,116 @@
     );
     $("customer-readout").textContent =
       `${date(day(), true)} · demand equivalent ${number(r.latent_demand * state.visitors)} · served equivalent ${number(r.sales * state.visitors)} · unserved equivalent ${number((r.latent_demand - r.sales) * state.visitors)}`;
+    renderOperations();
+  }
+  function renderOperations() {
+    if ($("analytics").hidden) return;
+    const series = run().operations.network,
+      r = series[state.index];
+    const pct = (value) => (value === null ? "—" : number(value * 100, 1) + "%");
+    const percent = (value) => (value === null ? null : value * 100);
+    for (const [d, depot] of data.depots.entries()) {
+      const history = run().byDepot[d],
+        current = history[state.index];
+      $(`depot-${d}-stats`).innerHTML = [
+        ["Dispatched today", number(current.dispatched)],
+        ["Daily production limit", number(current.capacity)],
+        ["Unused capacity", number(current.unused_capacity)],
+        ["In transit at close", number(current.in_transit)],
+      ]
+        .map(
+          ([label, value]) =>
+            `<div><span>${label}</span><strong>${value}</strong><small>bags</small></div>`,
+        )
+        .join("");
+      chart(
+        `depot-${d}-chart`,
+        history,
+        [
+          { value: (r) => r.dispatched, color: "#177977", area: true, width: 2 },
+          { value: (r) => r.in_transit, color: "#8170a2" },
+        ],
+        {
+          capacity: depot.production,
+          title: `${depot.name} dispatch, production limit and ice in transit`,
+        },
+      );
+      $(`depot-${d}-readout`).textContent =
+        `${date(day(), true)} · ${pct(current.dispatched / current.capacity)} production used · ${current.trips} trips${run().unlogged_receipts ? " · opening pipeline partly missing from this older log" : ""}`;
+    }
+    const metrics = [
+      ["fill", "Demand served today", pct(r.fill_rate), `Target ${pct(data.config.service)}`],
+      [
+        "load",
+        "Outbound truck load",
+        pct(r.truck_load),
+        r.trips ? `${number(r.dispatched)} bags / ${r.trips} trips` : "No departures today",
+      ],
+      [
+        "fleet",
+        "Fleet slots used",
+        `${r.trips} / ${data.config.trucks * data.config.trips_per_truck}`,
+        `${pct(r.fleet_use)} of daily trip capacity`,
+      ],
+      [
+        "production",
+        "Production capacity used",
+        pct(r.production_use),
+        "Both depots · selected day",
+      ],
+      ["yield", "Ice yield to date", pct(r.ice_yield), "Sold / (sold + melted + overflow)"],
+      [
+        "unit-cost",
+        "Cost per sold bag to date",
+        r.cost_per_sold_bag === null ? "—" : "€" + number(r.cost_per_sold_bag, 2),
+        "Includes lost-sales penalties",
+      ],
+    ];
+    $("efficiency-kpis").innerHTML = metrics
+      .map(
+        ([id, label, value, detail]) =>
+          `<div><span>${label}</span><strong id="eff-${id}">${value}</strong><small>${detail}</small></div>`,
+      )
+      .join("");
+    chart(
+      "efficiency-chart",
+      series,
+      [
+        { value: (r) => percent(r.fill_rate), color: "#177977", width: 2, key: "fill" },
+        { value: (r) => percent(r.truck_load), color: "#8170a2", key: "truck-load" },
+        { value: (r) => percent(r.fleet_use), color: "#af8a44", key: "fleet-use" },
+      ],
+      {
+        max: 100,
+        capacity: data.config.service * 100,
+        title: "Daily service, truck load and fleet utilization",
+      },
+    );
+    $("efficiency-readout").textContent =
+      `${date(day(), true)} · fill ${pct(r.fill_rate)} · truck load ${pct(r.truck_load)} · fleet use ${pct(r.fleet_use)}`;
+    chart(
+      "network-stock-chart",
+      series,
+      [
+        { value: (r) => r.closing, color: "#177977", area: true, width: 2 },
+        { value: (r) => r.in_transit, color: "#8170a2" },
+      ],
+      { title: "Total closing ice at bars and ice in transit" },
+    );
+    $("network-stock-readout").textContent =
+      `${date(day(), true)} · bar stock ${number(r.closing, 1)} · in transit ${number(r.in_transit)} · melted ${number(r.melt, 1)} bags`;
+    chart(
+      "cost-chart",
+      series,
+      [
+        { value: (r) => r.total_cost, color: "#47554e", dash: "4 3", width: 2 },
+        { value: (r) => r.stockout_cost, color: "#c6653b" },
+        { value: (r) => r.transport_cost, color: "#af8a44" },
+      ],
+      { title: "Daily total cost, lost-sales penalty and transport cost" },
+    );
+    $("cost-readout").textContent =
+      `${date(day(), true)} · total ${money(r.total_cost)} · transport ${money(r.transport_cost)} · holding ${money(r.holding_cost)} · waste ${money(r.waste_cost)} · lost sales ${money(r.stockout_cost)}`;
   }
   function render() {
     const selected = row(),
@@ -425,4 +553,5 @@
     number,
   };
   render();
+  if (location.hash === "#2d") setView("2d");
 })();
