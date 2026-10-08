@@ -100,6 +100,14 @@
   ];
   const projection = (lon, lat) => [(lon - 2.9) * 0.77 * 100, (39.62 - lat) * 100];
   const activeOrders = () => run().orders.filter((o) => o.departure <= day() && o.arrival >= day());
+  // Fulfillment lead time is real replay data; the empty return lasts one visual day only.
+  function truckJourney(order, selectedDay, fraction) {
+    const returning = selectedDay >= order.arrival;
+    const progress = returning
+      ? 1 - fraction
+      : (selectedDay - order.departure + fraction) / (order.arrival - order.departure);
+    return { returning, progress: Math.max(0, Math.min(1, progress)) };
+  }
   function selectBar(b) {
     state.bar = Number(b);
     $("bar").value = state.bar;
@@ -157,11 +165,14 @@
     };
     const path =
       coast.map(([lon, lat], i) => (i ? "L" : "M") + xy({ lon, lat }).join(",")).join(" ") + "Z";
-    let html = `<rect width="760" height="470" fill="#eaf1e9"/><path d="${path}" fill="#d7dcc1" stroke="#b1c5ab" stroke-width="2"/>`;
+    let html = `<defs><marker id="outbound-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#2d817d"/></marker><marker id="return-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#8b5fb5"/></marker></defs><rect width="760" height="470" fill="#eaf1e9"/><path d="${path}" fill="#d7dcc1" stroke="#b1c5ab" stroke-width="2"/>`;
     for (const o of activeOrders()) {
-      const a = xy(data.depots[o.depot]),
-        b = xy(data.bars[o.bar]);
-      html += `<path d="M${a} Q${(a[0] + b[0]) / 2},${Math.min(a[1], b[1]) - 24} ${b}" fill="none" stroke="#b89147" stroke-width="${o.bar === state.bar ? 2.5 : 1}" stroke-dasharray="4 4" opacity=".65"/>`;
+      const returning = truckJourney(o, day(), 0.5).returning;
+      const depot = xy(data.depots[o.depot]),
+        bar = xy(data.bars[o.bar]);
+      const a = returning ? bar : depot,
+        b = returning ? depot : bar;
+      html += `<path d="M${a} Q${(a[0] + b[0]) / 2},${Math.min(a[1], b[1]) - 24} ${b}" fill="none" stroke="${returning ? "#8b5fb5" : "#2d817d"}" stroke-width="${o.bar === state.bar ? 2.5 : 1}" stroke-dasharray="${returning ? "3 4" : "none"}" opacity=".65" marker-end="url(#${returning ? "return" : "outbound"}-arrow)"/>`;
     }
     for (const d of data.depots) {
       const [x, y] = xy(d);
@@ -407,6 +418,7 @@
     projection,
     coast,
     activeOrders,
+    truckJourney,
     selectBar,
     setView,
     render,

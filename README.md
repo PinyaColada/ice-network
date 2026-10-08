@@ -66,6 +66,11 @@ Click a chart to select its day. The naive policy correctly has no forecast band
 The 3D scene supports orbit/zoom; stock columns share a bags-to-height scale and
 wireframes show capacity. Delivery paths use the saved depot/bar assignments and
 lead times. The coastline and moving trucks are illustrative, not road/GPS tracks.
+Teal trucks carry ice to a bar; on its delivery day, the marker turns purple,
+faces the other way and returns empty to its own depot. It parks there after the
+animation completes, rather than vanishing at the bar. Return timing is illustrative
+and adds no simulated day, stock movement or extra cost: transport already charges
+the round trip. Markers represent shipments, not unique vehicles on actual shifts.
 
 The customer card counts **bars receiving ice**, out of the twelve bar customers.
 Visitor equivalents are a separate, explicitly labeled estimate: demand/sales bags

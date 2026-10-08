@@ -34,8 +34,8 @@
     <article class="island panel">
       <div class="panel-title"><div><span class="eyebrow">THE NETWORK</span><h2 id="map-title">An island of little freezers</h2></div><button id="reset-camera" class="quiet">Reset view</button></div>
       <div id="stage"><div id="scene-labels"></div><div id="webgl-fallback" hidden>3D is unavailable in this browser. The 2D map and charts still work.</div><svg id="map" viewBox="0 0 760 470" aria-label="Map of bars and depot routes"></svg></div>
-      <div class="map-legend"><span><i class="dot teal"></i> Closing ice</span><span><i class="dot rust-bg"></i> Lost sales</span><span><i class="square"></i> Depot</span><span class="map-help" id="map-help">Drag to orbit · scroll to zoom · select a bar</span></div>
-      <div class="map-note">Column height = bags; wireframe = capacity. Coastline and routes are schematic. Truck markers show shipment progress, not physical fleet positions.</div>
+      <div class="map-legend"><span><i class="dot teal"></i> Loaded → bar</span><span><i class="dot return-bg"></i> Empty → depot</span><span><i class="dot rust-bg"></i> Lost sales</span><span><i class="square"></i> Depot</span><span class="map-help" id="map-help">Drag to orbit · scroll to zoom · select a bar</span></div>
+      <div class="map-note">Columns = closing ice; wireframes = capacity. Purple trucks return on the delivery day and park at the depot. Return timing and routes are illustrative; round-trip costs are already included.</div>
       <div id="route-summary" class="route-summary"></div>
     </article>
     <aside class="bar-panel panel">

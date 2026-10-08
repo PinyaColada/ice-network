@@ -21,6 +21,55 @@ const { chromium } = require("playwright");
     const output = path.resolve(__dirname, "../artifacts");
     await page.goto(pathToFileURL(path.join(output, "replay.html")).href);
     await page.waitForFunction(() => window.iceReplay?.state.scene);
+    await page.waitForFunction(() =>
+      iceReplay.state.scene.inspectVehicles().some((v) => v.returning),
+    );
+    const firstFleet = await page.evaluate(() => iceReplay.state.scene.inspectVehicles());
+    assert(firstFleet.some((v) => !v.returning && v.color === "2d817d"));
+    assert(firstFleet.some((v) => v.returning && v.color === "8b5fb5"));
+    const firstReturn = firstFleet.find((v) => v.returning);
+    await page.waitForTimeout(250);
+    const movingReturn = await page.evaluate(
+      ({ bar, depot, arrival }) =>
+        iceReplay.state.scene
+          .inspectVehicles()
+          .find((v) => v.bar === bar && v.depot === depot && v.arrival === arrival),
+      firstReturn,
+    );
+    assert(movingReturn.progress < firstReturn.progress, "empty truck must move toward its depot");
+    await page.waitForFunction(() =>
+      iceReplay.state.scene
+        .inspectVehicles()
+        .filter((v) => v.returning)
+        .every((v) => v.progress === 0),
+    );
+    const parked = await page.evaluate(() => {
+      const a = iceReplay,
+        v = a.state.scene.inspectVehicles().find((v) => v.returning);
+      const depot = a.data.depots[v.depot],
+        [x, z] = a.projection(depot.lon, depot.lat);
+      return {
+        position: v.position,
+        depot: [x, 2, z],
+        count: a.state.scene.inspectVehicles().length,
+      };
+    });
+    assert.deepEqual(parked.position, parked.depot);
+    await page.selectOption("#bar", "1");
+    await page.waitForTimeout(100);
+    assert.equal(
+      await page.evaluate(() => iceReplay.state.scene.inspectVehicles().length),
+      parked.count,
+    );
+    assert(
+      await page.evaluate(() =>
+        iceReplay.state.scene
+          .inspectVehicles()
+          .filter((v) => v.returning)
+          .every((v) => v.progress === 0),
+      ),
+      "selection must not restart parked trucks",
+    );
     const chooseDay = async (index) =>
       page.locator("#timeline").evaluate((el, value) => {
         el.value = value;

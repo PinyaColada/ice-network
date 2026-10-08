@@ -191,8 +191,13 @@
   const routeGroup = new T.Group();
   scene.add(routeGroup);
   let vehicles = [];
+  let motionKey = "",
+    dayProgress = 0,
+    lastFrame = null;
   const truckWhite = material("#faf7e8"),
     truckBlue = material("#2d817d"),
+    returnBody = material("#cab4df"),
+    returnCab = material("#8b5fb5"),
     rubber = material("#43534d");
   function rebuildRoutes() {
     for (const child of [...routeGroup.children]) {
@@ -204,6 +209,7 @@
     }
     vehicles = [];
     for (const order of app.activeOrders()) {
+      const returning = app.truckJourney(order, app.day(), 0).returning;
       const depot = data.depots[order.depot],
         bar = data.bars[order.bar],
         a = projection(depot.lon, depot.lat),
@@ -216,7 +222,7 @@
       const line = new T.Line(
         new T.BufferGeometry().setFromPoints(curve.getPoints(45)),
         new T.LineBasicMaterial({
-          color: order.bar === state.bar ? "#967333" : "#b49760",
+          color: returning ? "#8b5fb5" : "#2d817d",
           transparent: true,
           opacity: order.bar === state.bar ? 0.9 : 0.42,
         }),
@@ -224,8 +230,8 @@
       line.userData.routeMaterial = true;
       routeGroup.add(line);
       const truck = new T.Group();
-      box(1.1, 0.8, 1.7, truckWhite, 0, 0.4, -0.2, truck);
-      box(1.1, 0.65, 0.65, truckBlue, 0, 0.32, 0.9, truck);
+      box(1.1, 0.8, 1.7, returning ? returnBody : truckWhite, 0, 0.4, -0.2, truck);
+      box(1.1, 0.65, 0.65, returning ? returnCab : truckBlue, 0, 0.32, 0.9, truck);
       for (const x of [-0.57, 0.57])
         for (const z of [-0.65, 0.65]) {
           const wheel = new T.Mesh(new T.CylinderGeometry(0.22, 0.22, 0.14, 8), rubber);
@@ -238,6 +244,12 @@
     }
   }
   function update() {
+    const key = `${state.run}/${app.day()}`;
+    if (key !== motionKey) {
+      motionKey = key;
+      dayProgress = 0;
+      lastFrame = null;
+    }
     for (const r of app.rows()) {
       const b = bars[r.bar],
         h = Math.max(0.04, height(r.closing));
@@ -288,20 +300,24 @@
   });
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   renderer.setAnimationLoop((time) => {
-    if (state.view !== "3d" || document.hidden) return;
+    if (state.view !== "3d" || document.hidden) {
+      lastFrame = null;
+      return;
+    }
+    const duration = state.timer ? Number(document.getElementById("speed").value) : 6000;
+    if (lastFrame !== null) dayProgress = Math.min(1, dayProgress + (time - lastFrame) / duration);
+    lastFrame = time;
     controls.update();
     for (const { truck, curve, order } of vehicles) {
-      const fraction = reduced ? 0.5 : (time * 0.0001) % 1;
-      const progress = Math.min(
-        0.99,
-        Math.max(
-          0.01,
-          (app.day() - order.departure + fraction) / (order.arrival - order.departure),
-        ),
+      const { progress, returning } = app.truckJourney(
+        order,
+        app.day(),
+        reduced ? 0.5 : dayProgress,
       );
       truck.position.copy(curve.getPoint(progress));
       const tangent = curve.getTangent(progress);
-      truck.rotation.y = Math.atan2(tangent.x, tangent.z);
+      truck.rotation.y = Math.atan2(tangent.x, tangent.z) + (returning ? Math.PI : 0);
+      truck.userData.journey = { progress, returning };
     }
     renderer.render(scene, camera);
     const w = stage.clientWidth,
@@ -327,6 +343,22 @@
       entry.el.hidden = v.z > 1 || Math.abs(v.x) > 0.95 || Math.abs(v.y) > 0.92;
     }
   });
-  state.scene = { update, resize, renderer, camera, controls };
+  state.scene = {
+    update,
+    resize,
+    renderer,
+    camera,
+    controls,
+    inspectVehicles: () =>
+      vehicles.map(({ truck, order }) => ({
+        ...truck.userData.journey,
+        arrival: order.arrival,
+        depot: order.depot,
+        bar: order.bar,
+        color: truck.children[1].material.color.getHexString(),
+        heading: truck.rotation.y,
+        position: truck.position.toArray(),
+      })),
+  };
   update();
 })();

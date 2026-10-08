@@ -402,6 +402,9 @@ input[type="range"] {
 .rust-bg {
   background: var(--rust);
 }
+.return-bg {
+  background: #8b5fb5;
+}
 .square {
   width: 7px;
   height: 7px;
