@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+artifacts/*.csv
+artifacts/*.json
+artifacts/*.png
+!artifacts/headline.png
+!artifacts/simulator.png
